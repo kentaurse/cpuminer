@@ -1,7 +1,10 @@
 /*
-   Copyright 2010 Jeff Garzik
-   Distributed under the MIT/X11 software license, see
-   http://www.opensource.org/licenses/mit-license.php
+ * Copyright 2010 Jeff Garzik
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option) 
+ * any later version.  See COPYING for more details.
  */
 
 #define _GNU_SOURCE
@@ -26,7 +29,6 @@
 
 enum {
 	STAT_SLEEP_INTERVAL		= 10,
-	POW_SLEEP_INTERVAL		= 1,
 	STAT_CTR_INTERVAL		= 10000000,
 };
 
@@ -40,7 +42,7 @@ static uint64_t hash_ctr;
 
 static struct argp_option options[] = {
 	{ "threads", 't', "N", 0,
-	  "Number of miner threads" },
+	  "Number of miner threads (default: 1)" },
 	{ "debug", 'D', NULL, 0,
 	  "Enable debug output" },
 	{ "protocol-dump", 'P', NULL, 0,
@@ -72,17 +74,6 @@ struct work {
 	unsigned char	hash1[64];
 	BIGNUM		*target;
 };
-
-#define ___constant_swab32(x) ((u32)(                       \
-        (((u32)(x) & (u32)0x000000ffUL) << 24) |            \
-        (((u32)(x) & (u32)0x0000ff00UL) <<  8) |            \
-        (((u32)(x) & (u32)0x00ff0000UL) >>  8) |            \
-        (((u32)(x) & (u32)0xff000000UL) >> 24)))
-
-static inline uint32_t swab32(uint32_t v)
-{
-	return ___constant_swab32(v);
-}
 
 static void databuf_free(struct data_buffer *db)
 {
@@ -466,12 +457,8 @@ static void *miner_thread(void *dummy)
 				 work->hash1, work->hash);
 
 		/* if nonce found, submit work */
-		if (nonce) {
+		if (nonce)
 			submit_work(work);
-
-			fprintf(stderr, "sleeping, after proof-of-work...\n");
-			sleep(POW_SLEEP_INTERVAL);
-		}
 
 		work_free(work);
 	}
@@ -534,15 +521,18 @@ int main (int argc, char *argv[])
 	error_t aprc;
 	int i;
 
+	/* parse command line */
 	aprc = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (aprc) {
 		fprintf(stderr, "argp_parse failed: %s\n", strerror(aprc));
 		return 1;
 	}
 
+	/* set our priority to the highest (aka "nicest, least intrusive") */
 	if (setpriority(PRIO_PROCESS, 0, 19))
 		perror("setpriority");
 
+	/* start mining threads */
 	for (i = 0; i < opt_n_threads; i++) {
 		pthread_t t;
 
@@ -551,11 +541,12 @@ int main (int argc, char *argv[])
 			return 1;
 		}
 
-		sleep(1);	/* don't pound server all at once */
+		sleep(1);	/* don't pound RPC server all at once */
 	}
 
 	fprintf(stderr, "%d miner threads started.\n", opt_n_threads);
 
+	/* main loop */
 	while (program_running) {
 		sleep(STAT_SLEEP_INTERVAL);
 		calc_stats();
