@@ -56,8 +56,10 @@ fi
 
 dnl Find YASM
 has_yasm=false
-AC_PATH_PROG([YASM],[yasm],[false])
-if test "x$YASM" != "xfalse" ; then
+AC_PATH_PROG(YASM,[yasm],[true yasm])
+if test "$YASM" = "false" ; then
+  AC_MSG_WARN([yasm is required for the x86_64 SSE2 code, but it was not found])
+else
   AC_MSG_CHECKING([if yasm version is greater than 1.0.1])
   yasmver=`yasm --version | head -1 | cut -d\  -f2`
   yamajor=`echo $yasmver | cut -d. -f1`
@@ -78,14 +80,11 @@ if test "x$YASM" != "xfalse" ; then
   else
     has_yasm=false
   fi
-  if test "x$has_yasm" = "xtrue" ; then
-    AC_MSG_RESULT([yes])
-  else
-    AC_MSG_RESULT([no])
-  fi
 fi
-if test "x$has_yasm" = "xfalse" ; then
-  AC_MSG_NOTICE([yasm is required for the sse2_64 algorithm. It will be skipped.])
+if test "x$has_yasm" == "xtrue" ; then
+  AC_MSG_RESULT([yes])
+else
+  AC_MSG_RESULT([no])
 fi
 
 AM_CONDITIONAL([HAS_YASM], [test x$has_yasm = xtrue])
